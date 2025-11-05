@@ -62,6 +62,11 @@
       box-shadow: 0 0 0 6px var(--ring);
       border-color: #2b88ff;
     }
+    /* Make calendar button icon more visible */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(80%) sepia(60%) saturate(400%) hue-rotate(180deg);
+      cursor: pointer;
+    }
 
     .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
@@ -87,6 +92,19 @@
     }
     .big h2 { margin: 0; font-size: 24px; letter-spacing: .2px; }
     .big .val { font-size: 36px; font-weight: 800; margin-top: 6px; }
+
+    .copy-btn {
+      margin-left: auto;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #000;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: background .2s ease;
+    }
+    .copy-btn:hover { background: #9ae6ff; }
 
     .help { margin-top: 18px; font-size: 13px; color: var(--muted); }
     .foot { margin-top: 22px; font-size: 12px; color: var(--muted); }
@@ -130,7 +148,7 @@
         <div class="stat"><h3>Days Remaining</h3><div class="val" id="daysLeft">—</div></div>
         <div class="stat"><h3>% Used</h3><div class="val" id="pctUsed">—</div></div>
         <div class="stat"><h3>% Remaining</h3><div class="val" id="pctLeft">—</div></div>
-        <div class="big"><div class="row"><h2>Pro‑Rated Refund</h2><span class="pill" id="note">Clamped between $0 and full price</span></div><div class="val" id="refund">—</div></div>
+        <div class="big"><div class="row"><h2>Pro‑Rated Refund</h2><button class="copy-btn" id="copyBtn">Copy</button></div><div class="val" id="refund">—</div></div>
       </div>
 
       <div class="help">
@@ -149,19 +167,17 @@
     const fields = ['refDate','endDate','price','duration'].map($);
 
     function parseDate(d) {
-      // Return Date or null
       if (!d) return null;
       const t = new Date(d);
       return Number.isNaN(t.getTime()) ? null : t;
     }
 
     function daysBetweenUTC(a, b) {
-      // Normalize to UTC midnight to avoid DST/timezone drift
       const toUTCDateOnly = (dt) => new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
       const A = toUTCDateOnly(a);
       const B = toUTCDateOnly(b);
-      const diffMs = B - A; // ms
-      return Math.floor(diffMs / 86400000); // days; non-inclusive of end day
+      const diffMs = B - A;
+      return Math.floor(diffMs / 86400000);
     }
 
     function currency(n) {
@@ -191,8 +207,8 @@
       }
 
       let used = daysBetweenUTC(ref, end);
-      if (used < 0) used = 0; // End before Reference → 0 used
-      if (used > duration) used = duration; // cap at total duration
+      if (used < 0) used = 0;
+      if (used > duration) used = duration;
 
       const remaining = Math.max(0, duration - used);
       const refund = Math.max(0, Math.min(price, price * (remaining / duration)));
@@ -203,16 +219,21 @@
       $('pctLeft').textContent = pct(remaining / duration);
       $('refund').textContent = currency(Math.round(refund * 100) / 100);
 
-      // Clarify clamping state
       let note = 'Clamped between $0 and full price';
       if (used === 0) note = 'No usage detected (End before/at Reference)';
       if (used === duration) note = 'Full usage reached';
       $('note').textContent = note;
+
+      $('copyBtn').onclick = () => {
+        const numOnly = (Math.round(refund * 100) / 100).toFixed(2);
+        navigator.clipboard.writeText(numOnly);
+        $('copyBtn').textContent = 'Copied!';
+        setTimeout(() => $('copyBtn').textContent = 'Copy', 1200);
+      };
     }
 
     fields.forEach(el => el.addEventListener('input', compute));
 
-    // Prefill sensible defaults
     (function seed() {
       const today = new Date();
       const iso = (d) => d.toISOString().slice(0,10);
