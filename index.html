@@ -205,16 +205,43 @@
       }
     }
 
+    // --- Query string presets ---
+    function applyQueryParams() {
+      const usp = new URLSearchParams(window.location.search);
+      if (![...usp.keys()].length) return; // nothing to do
+
+      // Build a lowercase map for flexible keys
+      const map = {}; usp.forEach((v, k) => { map[k.toLowerCase()] = v; });
+
+      // helpers
+      const isISO = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+      const setIf = (id, val, test) => {
+        if (val == null) return;
+        if (!test || test(val)) { $(id).value = val; }
+      };
+
+      // Accept multiple aliases
+      setIf('refDate', map['refdate'] || map['ref'] || map['start'] || map['startdate'], isISO);
+      setIf('endDate', map['enddate'] || map['end'] || map['stop'] || map['stopdate'], isISO);
+      setIf('price', map['price'] || map['amount'] || map['total'], (v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0);
+      setIf('duration', map['duration'] || map['days'] || map['term'] || map['length'], (v) => Number.isInteger(parseFloat(v)) || /^\d+$/.test(v));
+    }
+
     $('copyBtn').addEventListener('click', copyRefund);
     fields.forEach(el => el.addEventListener('input', compute));
 
-    (function seed() {
+    (function init() {
+      // defaults first
       const today = new Date();
       const iso = (d) => d.toISOString().slice(0,10);
       $('refDate').value = iso(new Date(today.getFullYear(), today.getMonth(), 1));
       $('endDate').value = iso(today);
       $('price').value = '100.00';
       $('duration').value = '365';
+
+      // then let query params override
+      applyQueryParams();
+
       compute();
     })();
   </script>
