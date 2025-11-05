@@ -102,6 +102,8 @@
             <span class="pill" id="note">Clamped between $0 and full price</span>
             <span class="spacer"></span>
             <button type="button" class="copy-btn" id="copyBtn" disabled>Copy</button>
+            <!-- New button -->
+            <button type="button" class="copy-btn" id="copyNotesBtn" disabled>Copy Notes</button>
           </div>
           <div class="val" id="refund">—</div>
         </div>
@@ -155,6 +157,7 @@
         $('refund').textContent = '—';
         $('note').textContent = 'Enter all inputs to calculate';
         $('copyBtn').disabled = true;
+        $('copyNotesBtn').disabled = true;
         lastRefundNumber = NaN;
         return;
       }
@@ -180,7 +183,9 @@
       if (used === duration) note = 'Full usage reached';
       $('note').textContent = note;
 
-      $('copyBtn').disabled = !isFinite(lastRefundNumber);
+      const hasValid = isFinite(lastRefundNumber);
+      $('copyBtn').disabled = !hasValid;
+      $('copyNotesBtn').disabled = !hasValid;
     }
 
     async function copyRefund() {
@@ -205,22 +210,47 @@
       }
     }
 
-    // --- Query string presets ---
+    async function copyNotes() {
+      // Full notes payload (human-friendly, multi-line)
+      const summary =
+`Refund Summary:
+- Reference Date: ${$('refDate').value}
+- End Date: ${$('endDate').value}
+- Price Paid: $${$('price').value}
+- Duration: ${$('duration').value} days
+- Days Used: ${$('daysUsed').textContent}
+- Days Remaining: ${$('daysLeft').textContent}
+- Percent Used: ${$('pctUsed').textContent}
+- Percent Remaining: ${$('pctLeft').textContent}
+- Calculated Refund: ${$('refund').textContent}
+- Notes: ${$('note').textContent}`;
+
+      const btn = $('copyNotesBtn');
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(summary);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = summary; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        }
+        const old = btn.textContent; btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = old, 1200);
+      } catch (e) {
+        const old = btn.textContent; btn.textContent = 'Copy failed';
+        setTimeout(() => btn.textContent = old, 1400);
+      }
+    }
+
+    // --- Query string presets (optional) ---
     function applyQueryParams() {
       const usp = new URLSearchParams(window.location.search);
-      if (![...usp.keys()].length) return; // nothing to do
+      if (![...usp.keys()].length) return;
 
-      // Build a lowercase map for flexible keys
       const map = {}; usp.forEach((v, k) => { map[k.toLowerCase()] = v; });
-
-      // helpers
       const isISO = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
-      const setIf = (id, val, test) => {
-        if (val == null) return;
-        if (!test || test(val)) { $(id).value = val; }
-      };
+      const setIf = (id, val, test) => { if (val == null) return; if (!test || test(val)) { $(id).value = val; } };
 
-      // Accept multiple aliases
       setIf('refDate', map['refdate'] || map['ref'] || map['start'] || map['startdate'], isISO);
       setIf('endDate', map['enddate'] || map['end'] || map['stop'] || map['stopdate'], isISO);
       setIf('price', map['price'] || map['amount'] || map['total'], (v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0);
@@ -228,10 +258,10 @@
     }
 
     $('copyBtn').addEventListener('click', copyRefund);
+    $('copyNotesBtn').addEventListener('click', copyNotes);
     fields.forEach(el => el.addEventListener('input', compute));
 
     (function init() {
-      // defaults first
       const today = new Date();
       const iso = (d) => d.toISOString().slice(0,10);
       $('refDate').value = iso(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -239,9 +269,7 @@
       $('price').value = '100.00';
       $('duration').value = '365';
 
-      // then let query params override
       applyQueryParams();
-
       compute();
     })();
   </script>
